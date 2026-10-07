@@ -45,13 +45,13 @@ def load_demo_data():
 
     demo_df = pd.DataFrame(data)
 
-    # Convert byte values
     for col in demo_df.columns:
 
         if demo_df[col].dtype == object:
 
             demo_df[col] = demo_df[col].apply(
-                lambda x: x.decode("utf-8")
+                lambda x:
+                x.decode("utf-8")
                 if isinstance(x, bytes)
                 else x
             )
@@ -83,6 +83,7 @@ feature_labels = {
     "Attr8": "Book Value of Equity / Total Liabilities",
     "Attr9": "Sales / Total Assets",
     "Attr10": "Equity / Total Assets",
+
     "Attr11": "(Gross Profit + Extraordinary Items + Financial Expenses) / Total Assets",
     "Attr12": "Gross Profit / Short-Term Liabilities",
     "Attr13": "(Gross Profit + Depreciation) / Sales",
@@ -93,6 +94,7 @@ feature_labels = {
     "Attr18": "Gross Profit / Total Assets",
     "Attr19": "Gross Profit / Sales",
     "Attr20": "Inventory × 365 / Sales",
+
     "Attr21": "Sales (Current Year) / Sales (Previous Year)",
     "Attr22": "Operating Profit / Total Assets",
     "Attr23": "Net Profit / Sales",
@@ -103,6 +105,7 @@ feature_labels = {
     "Attr28": "Working Capital / Fixed Assets",
     "Attr29": "Logarithm of Total Assets",
     "Attr30": "(Total Liabilities - Cash) / Sales",
+
     "Attr31": "(Gross Profit + Interest) / Sales",
     "Attr32": "Current Liabilities × 365 / Cost of Products Sold",
     "Attr33": "Operating Expenses / Short-Term Liabilities",
@@ -113,7 +116,8 @@ feature_labels = {
     "Attr38": "Constant Capital / Total Assets",
     "Attr39": "Profit on Sales / Sales",
     "Attr40": "(Current Assets - Inventory - Receivables) / Short-Term Liabilities",
-    "Attr41": "Total Liabilities / Operating Profit + Depreciation",
+
+    "Attr41": "Total Liabilities / (Operating Profit + Depreciation)",
     "Attr42": "Operating Profit / Sales",
     "Attr43": "Receivables + Inventory Turnover in Days",
     "Attr44": "Receivables × 365 / Sales",
@@ -123,6 +127,7 @@ feature_labels = {
     "Attr48": "EBITDA / Total Assets",
     "Attr49": "EBITDA / Sales",
     "Attr50": "Current Assets / Total Liabilities",
+
     "Attr51": "Short-Term Liabilities / Total Assets",
     "Attr52": "Short-Term Liabilities × 365 / Cost of Products Sold",
     "Attr53": "Equity / Fixed Assets",
@@ -133,6 +138,7 @@ feature_labels = {
     "Attr58": "Total Costs / Total Sales",
     "Attr59": "Long-Term Liabilities / Equity",
     "Attr60": "Sales / Inventory",
+
     "Attr61": "Sales / Receivables",
     "Attr62": "Short-Term Liabilities × 365 / Sales",
     "Attr63": "Sales / Short-Term Liabilities",
@@ -299,7 +305,7 @@ st.markdown(
 
     <b>🔍 How does the system work?</b><br><br>
 
-    The company’s financial ratios are provided to a trained
+    The company's financial ratios are provided to a trained
     Random Forest model. The model estimates a bankruptcy
     probability and compares it with the optimized decision
     threshold of <b>0.53</b>.
@@ -311,7 +317,7 @@ st.markdown(
 
 
 # ============================================================
-# DEMO COMPANY SELECTION
+# COMPANY FINANCIAL INFORMATION
 # ============================================================
 
 st.markdown(
@@ -321,25 +327,151 @@ st.markdown(
 
 st.write(
     "You can test the system using a real company record from "
-    "the dataset or enter financial ratios manually."
+    "the dataset, enter financial ratios manually, or upload "
+    "a company CSV/Excel file."
 )
+
+
+# ============================================================
+# INPUT METHOD
+# ============================================================
+
+input_methods = [
+    "Manual Financial Inputs",
+    "Upload Company File (CSV / Excel)",
+    "Demo: Non-Bankrupt Company",
+    "Demo: Bankrupt Company"
+]
 
 
 demo_option = st.selectbox(
     "Choose input method",
-    [
-        "Manual Financial Inputs",
-        "Demo: Non-Bankrupt Company",
-        "Demo: Bankrupt Company"
-    ]
+    input_methods,
+    key="input_method"
 )
 
 
 # ============================================================
-# SELECT DEMO ROW
+# SESSION STATE
+# ============================================================
+
+if "manual_values" not in st.session_state:
+
+    st.session_state.manual_values = {
+        feature: 0.0
+        for feature in feature_names
+    }
+
+
+# ============================================================
+# UPLOAD FILE
+# ============================================================
+
+uploaded_df = None
+selected_upload = None
+
+
+if demo_option == "Upload Company File (CSV / Excel)":
+
+    st.subheader("📁 Upload Company Financial Data")
+
+    uploaded_file = st.file_uploader(
+        "Upload CSV or Excel file",
+        type=["csv", "xlsx"],
+        help=(
+            "Your file must contain Attr1 through Attr64. "
+            "Each row represents one company."
+        )
+    )
+
+    if uploaded_file is not None:
+
+        try:
+
+            if uploaded_file.name.lower().endswith(".csv"):
+
+                uploaded_df = pd.read_csv(uploaded_file)
+
+            else:
+
+                uploaded_df = pd.read_excel(uploaded_file)
+
+
+            # Clean column names
+
+            uploaded_df.columns = [
+                str(column).strip()
+                for column in uploaded_df.columns
+            ]
+
+
+            # Check required columns
+
+            missing_columns = [
+                feature
+                for feature in feature_names
+                if feature not in uploaded_df.columns
+            ]
+
+
+            if missing_columns:
+
+                st.error(
+                    "❌ Your file is missing these required columns: "
+                    + ", ".join(missing_columns)
+                )
+
+                uploaded_df = None
+
+
+            elif len(uploaded_df) == 0:
+
+                st.error(
+                    "❌ The uploaded file contains no company records."
+                )
+
+                uploaded_df = None
+
+
+            else:
+
+                st.success(
+                    f"✅ File loaded successfully. "
+                    f"{len(uploaded_df)} company record(s) found."
+                )
+
+
+                # If multiple companies are present
+
+                if len(uploaded_df) > 1:
+
+                    selected_row = st.selectbox(
+                        "Select company record",
+                        range(len(uploaded_df)),
+                        format_func=lambda x:
+                        f"Company record {x + 1}"
+                    )
+
+                    selected_upload = uploaded_df.iloc[selected_row]
+
+                else:
+
+                    selected_upload = uploaded_df.iloc[0]
+
+
+        except Exception as error:
+
+            st.error(
+                f"❌ Could not read the uploaded file: {error}"
+            )
+
+
+# ============================================================
+# DEMO COMPANY
 # ============================================================
 
 selected_demo = None
+
 
 if demo_option == "Demo: Non-Bankrupt Company":
 
@@ -370,7 +502,40 @@ elif demo_option == "Demo: Bankrupt Company":
 
 
 # ============================================================
-# INPUT VALUES
+# APPLY DEMO / UPLOAD VALUES
+# ============================================================
+
+if selected_demo is not None:
+
+    for feature in feature_names:
+
+        value = selected_demo[feature]
+
+        if pd.isna(value):
+            value = 0.0
+
+        st.session_state.manual_values[feature] = float(value)
+
+
+elif selected_upload is not None:
+
+    for feature in feature_names:
+
+        value = pd.to_numeric(
+            pd.Series(
+                [selected_upload[feature]]
+            ),
+            errors="coerce"
+        ).iloc[0]
+
+        if pd.isna(value):
+            value = 0.0
+
+        st.session_state.manual_values[feature] = float(value)
+
+
+# ============================================================
+# FINANCIAL INPUTS
 # ============================================================
 
 input_values = {}
@@ -378,41 +543,65 @@ input_values = {}
 
 for category, features in categories.items():
 
-    with st.expander(category, expanded=False):
+    with st.expander(
+        category,
+        expanded=False
+    ):
 
         columns = st.columns(3)
 
         for i, feature in enumerate(features):
 
-            if selected_demo is not None:
-
-                default_value = selected_demo[feature]
-
-                if pd.isna(default_value):
-                    default_value = 0.0
-
-            else:
-
-                default_value = 0.0
-
             with columns[i % 3]:
 
+                widget_key = (
+                    f"financial_input_{feature}"
+                )
+
+
+                if widget_key not in st.session_state:
+
+                    st.session_state[
+                        widget_key
+                    ] = st.session_state[
+                        "manual_values"
+                    ].get(
+                        feature,
+                        0.0
+                    )
+
+
                 input_values[feature] = st.number_input(
+
                     feature_labels.get(
                         feature,
                         feature
                     ),
-                    value=float(default_value),
+
                     format="%.6f",
-                    key=f"{demo_option}_{feature}"
+
+                    key=widget_key
                 )
 
 
+                # Save the value so it survives reruns
+
+                st.session_state[
+                    "manual_values"
+                ][feature] = input_values[feature]
+
+
 # ============================================================
-# PREDICTION BUTTON
+# ANALYZE BUTTON
 # ============================================================
 
 st.write("")
+
+st.info(
+    "💡 Enter your financial ratios and click "
+    "**ANALYZE COMPANY**. Your values will remain saved."
+)
+
 
 predict = st.button(
     "🔮 ANALYZE COMPANY",
@@ -427,7 +616,9 @@ predict = st.button(
 
 if predict:
 
-    # Create dataframe in correct feature order
+    # --------------------------------------------------------
+    # Create dataframe in EXACT feature order
+    # --------------------------------------------------------
 
     input_data = pd.DataFrame(
         [
@@ -440,7 +631,9 @@ if predict:
     )
 
 
-    # Replace infinite values
+    # --------------------------------------------------------
+    # Replace infinity
+    # --------------------------------------------------------
 
     input_data = input_data.replace(
         [np.inf, -np.inf],
@@ -448,24 +641,45 @@ if predict:
     )
 
 
+    # --------------------------------------------------------
     # Apply trained imputer
+    # --------------------------------------------------------
 
-    input_imputed = imputer.transform(
-        input_data
-    )
+    try:
+
+        input_imputed = imputer.transform(
+            input_data
+        )
+
+    except Exception as error:
+
+        st.error(
+            "❌ The financial input could not be processed. "
+            "Please make sure all 64 values are numeric."
+        )
+
+        st.exception(error)
+
+        st.stop()
 
 
+    # --------------------------------------------------------
     # Probability
+    # --------------------------------------------------------
 
     probability = model.predict_proba(
         input_imputed
     )[0][1]
 
 
-    probability_percent = probability * 100
+    probability_percent = (
+        probability * 100
+    )
 
 
-    # Apply optimized threshold
+    # --------------------------------------------------------
+    # Apply threshold
+    # --------------------------------------------------------
 
     prediction = (
         1
@@ -481,14 +695,16 @@ if predict:
     st.divider()
 
     st.markdown(
-        '<div class="section-title">🤖 AI Prediction Result</div>',
+        '<div class="section-title">'
+        '🤖 AI Prediction Result'
+        '</div>',
         unsafe_allow_html=True
     )
 
-    st.write("")
 
-
+    # --------------------------------------------------------
     # Risk level
+    # --------------------------------------------------------
 
     if probability < 0.30:
 
@@ -503,7 +719,9 @@ if predict:
         risk_level = "HIGH"
 
 
-    # Result message
+    # --------------------------------------------------------
+    # Result
+    # --------------------------------------------------------
 
     if prediction == 1:
 
@@ -512,8 +730,8 @@ if predict:
         )
 
         st.write(
-            "The AI model classifies this company as "
-            "**potentially financially distressed**."
+            "The AI model classifies this company "
+            "as potentially financially distressed."
         )
 
     else:
@@ -565,11 +783,20 @@ if predict:
 
     st.write("")
 
-    st.subheader("📊 Bankruptcy Risk Score")
+    st.subheader(
+        "📊 Bankruptcy Risk Score"
+    )
+
 
     st.progress(
-        float(min(probability, 1.0))
+        float(
+            min(
+                probability,
+                1.0
+            )
+        )
     )
+
 
     st.caption(
         f"Model-estimated bankruptcy probability: "
@@ -584,17 +811,21 @@ if predict:
     if probability >= threshold:
 
         st.warning(
-            f"The predicted probability ({probability:.3f}) "
-            f"is above the model threshold ({threshold:.2f}), "
-            "so the company is classified as having bankruptcy risk."
+            f"The predicted probability "
+            f"({probability:.3f}) is above the "
+            f"model threshold ({threshold:.2f}), "
+            "so the company is classified as "
+            "having bankruptcy risk."
         )
 
     else:
 
         st.info(
-            f"The predicted probability ({probability:.3f}) "
-            f"is below the model threshold ({threshold:.2f}), "
-            "so the company is not classified as bankrupt."
+            f"The predicted probability "
+            f"({probability:.3f}) is below the "
+            f"model threshold ({threshold:.2f}), "
+            "so the company is not classified "
+            "as bankrupt."
         )
 
 
@@ -607,6 +838,7 @@ if predict:
     st.subheader(
         "📈 Most Important Financial Factors"
     )
+
 
     importance = model.feature_importances_
 
@@ -624,7 +856,6 @@ if predict:
         ],
 
         "Importance": importance
-
     })
 
 
@@ -658,6 +889,7 @@ if predict:
     st.subheader(
         "📋 Financial Input Summary"
     )
+
 
     summary_df = pd.DataFrame({
 
