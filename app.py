@@ -505,6 +505,10 @@ elif demo_option == "Demo: Bankrupt Company":
 # APPLY DEMO / UPLOAD VALUES
 # ============================================================
 
+# ============================================================
+# APPLY DEMO / UPLOAD VALUES
+# ============================================================
+
 if selected_demo is not None:
 
     for feature in feature_names:
@@ -514,7 +518,14 @@ if selected_demo is not None:
         if pd.isna(value):
             value = 0.0
 
-        st.session_state.manual_values[feature] = float(value)
+        value = float(value)
+
+        # Save both the persistent value AND the actual
+        # Streamlit number_input widget value.
+        st.session_state.manual_values[feature] = value
+
+        widget_key = f"financial_input_{feature}"
+        st.session_state[widget_key] = value
 
 
 elif selected_upload is not None:
@@ -531,7 +542,14 @@ elif selected_upload is not None:
         if pd.isna(value):
             value = 0.0
 
-        st.session_state.manual_values[feature] = float(value)
+        value = float(value)
+
+        # Save both the persistent value AND the actual
+        # Streamlit number_input widget value.
+        st.session_state.manual_values[feature] = value
+
+        widget_key = f"financial_input_{feature}"
+        st.session_state[widget_key] = value
 
 
 # ============================================================
